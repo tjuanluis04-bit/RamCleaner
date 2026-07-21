@@ -3,4 +3,10 @@
     <string name="status_initial">Listo</string>
     <string name="request_permission">Pedir permiso a Shizuku</string>
     <string name="kill_all">Cerrar todas las apps</string>
+    <string name="edit_whitelist">Elegir apps a excluir</string>
+    <string name="whitelist_instructions">Marca las apps que NO quieres que se cierren nunca (ej. WhatsApp, Spotify, tu launcher)</string>
+    <string name="save_whitelist">Guardar</string>
+    <string name="auto_mode_title">Auto-activación por RAM</string>
+    <string name="auto_mode_switch">Activar monitoreo automático</string>
+    <string name="threshold_label">Cerrar apps cuando la RAM libre baje de:</string>
 </resources>

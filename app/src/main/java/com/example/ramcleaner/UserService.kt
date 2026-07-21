@@ -13,8 +13,9 @@ class UserService : IUserService.Stub() {
         System.exit(0)
     }
 
-    override fun forceStopAll(): Int {
+    override fun forceStopAll(whitelist: Array<String>): Int {
         var closed = 0
+        val excluded = whitelist.toHashSet()
         try {
             // "pm list packages -3" = solo apps de terceros (no del sistema)
             val listProcess = Runtime.getRuntime().exec(arrayOf("sh", "-c", "pm list packages -3"))
@@ -28,6 +29,7 @@ class UserService : IUserService.Stub() {
 
             for (pkg in packages) {
                 if (pkg == myPackage) continue
+                if (excluded.contains(pkg)) continue
                 try {
                     val stopProcess = Runtime.getRuntime().exec(arrayOf("am", "force-stop", pkg))
                     stopProcess.waitFor()
