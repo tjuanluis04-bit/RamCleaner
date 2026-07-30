@@ -16,6 +16,12 @@ class UserService : IUserService.Stub() {
     override fun forceStopAll(whitelist: Array<String>): Int {
         var closed = 0
         val excluded = whitelist.toHashSet()
+
+        // Protección extra: nunca cerrar la app que esté en primer plano
+        // justo en este momento (evita matar el launcher/wallpaper/teclado
+        // mientras están activos, que es lo que dispara "System UI no responde").
+        getForegroundPackage()?.let { excluded.add(it) }
+
         try {
             // "pm list packages -3" = solo apps de terceros (no del sistema)
             val listProcess = Runtime.getRuntime().exec(arrayOf("sh", "-c", "pm list packages -3"))
@@ -34,6 +40,8 @@ class UserService : IUserService.Stub() {
                     val stopProcess = Runtime.getRuntime().exec(arrayOf("am", "force-stop", pkg))
                     stopProcess.waitFor()
                     closed++
+                    // Pausa corta entre cada cierre para no saturar CPU/IO de golpe.
+                    Thread.sleep(60)
                 } catch (e: Exception) {
                     // Algunas apps protegidas pueden fallar; se ignoran y se sigue con las demás.
                 }
@@ -42,5 +50,22 @@ class UserService : IUserService.Stub() {
             // Si falla el listado completo, simplemente no se cierra nada.
         }
         return closed
+    }
+
+    /**
+     * Usa "dumpsys window" (disponible porque este proceso corre con
+     * privilegios de shell) para saber qué app está en primer plano ahora
+     * mismo, y así nunca cerrarla por accidente.
+     */
+    private fun getForegroundPackage(): String? {
+        return try {
+            val proc = Runtime.getRuntime().exec(arrayOf("sh", "-c", "dumpsys window | grep mCurrentFocus"))
+            val output = proc.inputStream.bufferedReader().readText()
+            proc.waitFor()
+            val regex = Regex("""([a-zA-Z0-9_.]+)/[a-zA-Z0-9_.$]+}""")
+            regex.find(output)?.groupValues?.get(1)
+        } catch (e: Exception) {
+            null
+        }
     }
 }

@@ -2,9 +2,11 @@ package com.example.ramcleaner
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.IBinder
+import android.provider.Settings
 import rikka.shizuku.Shizuku
 
 object ShizukuHelper {
@@ -26,8 +28,33 @@ object ShizukuHelper {
     }
 
     /**
+     * Apps que siempre se deben proteger sin que el usuario tenga que
+     * agregarlas manualmente: el launcher actual y el teclado actual.
+     * Cerrarlos de golpe es lo que suele provocar que se trabe el fondo
+     * de pantalla o salga "System UI no responde".
+     */
+    private fun getAutoProtectedPackages(context: Context): Set<String> {
+        val protected = mutableSetOf<String>()
+        try {
+            val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            val resolveInfo = context.packageManager.resolveActivity(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
+            resolveInfo?.activityInfo?.packageName?.let { protected.add(it) }
+        } catch (e: Exception) {
+            // ignorar
+        }
+        try {
+            val ime = Settings.Secure.getString(context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
+            ime?.substringBefore("/")?.takeIf { it.isNotBlank() }?.let { protected.add(it) }
+        } catch (e: Exception) {
+            // ignorar
+        }
+        return protected
+    }
+
+    /**
      * Se conecta al UserService, ejecuta forceStopAll respetando la whitelist
-     * guardada en PrefsHelper, y entrega el resultado por callback.
+     * guardada en PrefsHelper (más el launcher/teclado, protegidos siempre),
+     * y entrega el resultado por callback.
      * onResult(count, null) en éxito, onResult(-1, "mensaje") en error.
      */
     fun runForceStop(context: Context, onResult: (count: Int, error: String?) -> Unit) {
@@ -35,7 +62,7 @@ object ShizukuHelper {
             onResult(-1, "Sin permiso de Shizuku")
             return
         }
-        val whitelist = PrefsHelper.getWhitelist(context).toTypedArray()
+        val whitelist = (PrefsHelper.getWhitelist(context) + getAutoProtectedPackages(context)).toTypedArray()
         val args = userServiceArgs(context)
 
         val connection = object : ServiceConnection {
