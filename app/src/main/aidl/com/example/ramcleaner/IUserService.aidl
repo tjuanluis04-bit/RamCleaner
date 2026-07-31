@@ -10,4 +10,8 @@ interface IUserService {
     // saltándose las que estén en "whitelist" (paquetes a no cerrar).
     // Devuelve cuántas apps se cerraron.
     int forceStopAll(in String[] whitelist) = 1;
+
+    // Ajusta la escala global de animaciones del sistema
+    // (1.0 = normal, 0.5 = rápidas, 0.0 = desactivadas).
+    void setAnimationScale(float scale) = 2;
 }

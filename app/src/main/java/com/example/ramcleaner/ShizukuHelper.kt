@@ -17,7 +17,7 @@ object ShizukuHelper {
         .daemon(false)
         .processNameSuffix("service")
         .debuggable(false)
-        .version(1)
+        .version(2)
 
     fun hasPermission(): Boolean {
         return try {
@@ -85,6 +85,37 @@ object ShizukuHelper {
             override fun onServiceDisconnected(name: ComponentName?) {}
         }
 
+        Shizuku.bindUserService(args, connection)
+    }
+
+    /**
+     * Ajusta la escala de animaciones del sistema (1.0 normal, 0.5 rápidas, 0 desactivadas).
+     */
+    fun setAnimationScale(context: Context, scale: Float, onResult: (success: Boolean, error: String?) -> Unit) {
+        if (!hasPermission()) {
+            onResult(false, "Sin permiso de Shizuku")
+            return
+        }
+        val args = userServiceArgs(context)
+        val connection = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+                try {
+                    val service = IUserService.Stub.asInterface(binder)
+                    service.setAnimationScale(scale)
+                    onResult(true, null)
+                } catch (e: Exception) {
+                    onResult(false, e.message ?: "error desconocido")
+                } finally {
+                    try {
+                        Shizuku.unbindUserService(args, this, false)
+                    } catch (e: Exception) {
+                        // ignorar
+                    }
+                }
+            }
+
+            override fun onServiceDisconnected(name: ComponentName?) {}
+        }
         Shizuku.bindUserService(args, connection)
     }
 }

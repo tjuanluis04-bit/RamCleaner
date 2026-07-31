@@ -40,6 +40,16 @@ class UserService : IUserService.Stub() {
                     val stopProcess = Runtime.getRuntime().exec(arrayOf("am", "force-stop", pkg))
                     stopProcess.waitFor()
                     closed++
+
+                    // Mete la app en el bucket "restricted" de App Standby para que
+                    // Android le restrinja el auto-inicio en segundo plano y no
+                    // vuelva a llenar la RAM sola apenas la cerramos.
+                    try {
+                        Runtime.getRuntime().exec(arrayOf("am", "set-standby-bucket", pkg, "restricted")).waitFor()
+                    } catch (e: Exception) {
+                        // ignorar
+                    }
+
                     // Pausa corta entre cada cierre para no saturar CPU/IO de golpe.
                     Thread.sleep(60)
                 } catch (e: Exception) {
@@ -66,6 +76,18 @@ class UserService : IUserService.Stub() {
             regex.find(output)?.groupValues?.get(1)
         } catch (e: Exception) {
             null
+        }
+    }
+
+    override fun setAnimationScale(scale: Float) {
+        val value = scale.toString()
+        val keys = listOf("window_animation_scale", "transition_animation_scale", "animator_duration_scale")
+        for (key in keys) {
+            try {
+                Runtime.getRuntime().exec(arrayOf("settings", "put", "global", key, value)).waitFor()
+            } catch (e: Exception) {
+                // ignorar
+            }
         }
     }
 }

@@ -9,4 +9,6 @@
     <string name="auto_mode_title">Auto-activación por RAM</string>
     <string name="auto_mode_switch">Activar monitoreo automático</string>
     <string name="threshold_label">Cerrar apps cuando la RAM libre baje de:</string>
+    <string name="fast_animations_title">Animaciones del sistema</string>
+    <string name="fast_animations_switch">Animaciones rápidas (0.5x)</string>
 </resources>

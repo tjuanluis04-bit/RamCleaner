@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.widget.Button
 import android.widget.SeekBar
 import android.widget.Switch
@@ -24,6 +25,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var autoModeSwitch: Switch
     private lateinit var thresholdSeekBar: SeekBar
     private lateinit var thresholdValueText: TextView
+    private lateinit var fastAnimationsSwitch: Switch
 
     private val permissionListener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
         if (requestCode == permissionRequestCode) {
@@ -48,6 +50,7 @@ class MainActivity : AppCompatActivity() {
         autoModeSwitch = findViewById(R.id.autoModeSwitch)
         thresholdSeekBar = findViewById(R.id.thresholdSeekBar)
         thresholdValueText = findViewById(R.id.thresholdValueText)
+        fastAnimationsSwitch = findViewById(R.id.fastAnimationsSwitch)
 
         requestButton.setOnClickListener { requestShizukuPermission() }
         killButton.setOnClickListener { performForceStop() }
@@ -56,6 +59,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         setupAutoModeControls()
+        setupFastAnimationsControl()
     }
 
     override fun onDestroy() {
@@ -145,6 +149,28 @@ class MainActivity : AppCompatActivity() {
                 != PackageManager.PERMISSION_GRANTED
             ) {
                 requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), notificationPermissionRequestCode)
+            }
+        }
+    }
+
+    // ---------- Animaciones rápidas ----------
+
+    private fun setupFastAnimationsControl() {
+        val currentScale = Settings.Global.getFloat(contentResolver, Settings.Global.WINDOW_ANIMATION_SCALE, 1f)
+        fastAnimationsSwitch.isChecked = currentScale < 0.99f
+
+        fastAnimationsSwitch.setOnCheckedChangeListener { _, isChecked ->
+            val scale = if (isChecked) 0.5f else 1.0f
+            ShizukuHelper.setAnimationScale(this, scale) { success, error ->
+                runOnUiThread {
+                    if (success) {
+                        val msg = if (isChecked) "Animaciones a 0.5x" else "Animaciones normales"
+                        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(this, "Error: $error", Toast.LENGTH_SHORT).show()
+                        fastAnimationsSwitch.isChecked = !isChecked
+                    }
+                }
             }
         }
     }
