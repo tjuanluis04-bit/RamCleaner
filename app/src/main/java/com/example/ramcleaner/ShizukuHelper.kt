@@ -28,13 +28,29 @@ object ShizukuHelper {
     }
 
     /**
+     * Paquetes que jamás se deben cerrar ni restringir, sin importar lo
+     * que reporte "pm list packages -3". En algunos equipos Google Play
+     * Services / Play Store aparecen ahí como si fueran de terceros, y
+     * forzar su cierre es lo que provoca que se caiga la interfaz del
+     * sistema (tiles en "no disponible", toques fantasma, "Google Play
+     * Services se detuvo").
+     */
+    private val CRITICAL_PACKAGES = setOf(
+        "com.google.android.gms",           // Google Play Services
+        "com.google.android.gsf",           // Google Services Framework
+        "com.android.vending",              // Play Store
+        "com.google.android.gsf.login"
+    )
+
+    /**
      * Apps que siempre se deben proteger sin que el usuario tenga que
-     * agregarlas manualmente: el launcher actual y el teclado actual.
-     * Cerrarlos de golpe es lo que suele provocar que se trabe el fondo
-     * de pantalla o salga "System UI no responde".
+     * agregarlas manualmente: el launcher actual, el teclado actual, y
+     * los paquetes críticos de Google. Cerrarlos de golpe es lo que suele
+     * provocar que se trabe el fondo de pantalla o salga "System UI no responde".
      */
     private fun getAutoProtectedPackages(context: Context): Set<String> {
         val protected = mutableSetOf<String>()
+        protected.addAll(CRITICAL_PACKAGES)
         try {
             val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
             val resolveInfo = context.packageManager.resolveActivity(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
