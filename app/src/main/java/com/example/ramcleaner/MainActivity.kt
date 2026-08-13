@@ -47,6 +47,9 @@ class MainActivity : AppCompatActivity() {
         val requestButton = findViewById<Button>(R.id.requestPermissionButton)
         val killButton = findViewById<Button>(R.id.killAllButton)
         val whitelistButton = findViewById<Button>(R.id.whitelistButton)
+        val freezeButton = findViewById<Button>(R.id.freezeButton)
+        val unfreezeButton = findViewById<Button>(R.id.unfreezeButton)
+        val topMemoryButton = findViewById<Button>(R.id.topMemoryButton)
         autoModeSwitch = findViewById(R.id.autoModeSwitch)
         thresholdSeekBar = findViewById(R.id.thresholdSeekBar)
         thresholdValueText = findViewById(R.id.thresholdValueText)
@@ -56,6 +59,11 @@ class MainActivity : AppCompatActivity() {
         killButton.setOnClickListener { performForceStop() }
         whitelistButton.setOnClickListener {
             startActivity(Intent(this, WhitelistActivity::class.java))
+        }
+        freezeButton.setOnClickListener { performFreeze() }
+        unfreezeButton.setOnClickListener { performUnfreeze() }
+        topMemoryButton.setOnClickListener {
+            startActivity(Intent(this, TopMemoryActivity::class.java))
         }
 
         setupAutoModeControls()
@@ -81,7 +89,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ---------- Botón manual ----------
+    // ---------- Botón manual: cerrar todas ----------
 
     private fun performForceStop() {
         val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
@@ -105,6 +113,26 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // ---------- Congelar / descongelar ----------
+
+    private fun performFreeze() {
+        statusText.text = "Congelando apps inactivas…"
+        ShizukuHelper.freezeInactiveApps(this) { count, error ->
+            runOnUiThread {
+                statusText.text = if (error != null) "Error: $error" else "$count apps congeladas"
+            }
+        }
+    }
+
+    private fun performUnfreeze() {
+        statusText.text = "Descongelando…"
+        ShizukuHelper.unfreezeApps(this) { count, error ->
+            runOnUiThread {
+                statusText.text = if (error != null) "Error: $error" else "$count apps descongeladas"
+            }
+        }
+    }
+
     // ---------- Auto-activación por umbral ----------
 
     private fun setupAutoModeControls() {
@@ -121,7 +149,6 @@ class MainActivity : AppCompatActivity() {
                 if (fromUser) {
                     PrefsHelper.setThreshold(this@MainActivity, percent)
                     if (autoModeSwitch.isChecked) {
-                        // reinicia el servicio para que tome el nuevo umbral de inmediato
                         startForegroundService(Intent(this@MainActivity, RamMonitorService::class.java))
                     }
                 }

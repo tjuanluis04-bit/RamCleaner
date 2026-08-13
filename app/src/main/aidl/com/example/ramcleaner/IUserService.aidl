@@ -14,4 +14,16 @@ interface IUserService {
     // Ajusta la escala global de animaciones del sistema
     // (1.0 = normal, 0.5 = rápidas, 0.0 = desactivadas).
     void setAnimationScale(float scale) = 2;
+
+    // Mete en el bucket "restricted" de App Standby a todas las apps
+    // elegibles (sin cerrarlas). Devuelve cuántas se marcaron.
+    int freezeInactiveApps(in String[] whitelist) = 3;
+
+    // Devuelve las apps elegibles al bucket "active" (revierte el congelado).
+    // Devuelve cuántas se revirtieron.
+    int unfreezeApps(in String[] whitelist) = 4;
+
+    // Devuelve las apps que más RAM consumen ahora mismo, como texto
+    // "paquete:kilobytes" separado por saltos de línea (ya ordenado desc).
+    String getTopMemoryUsage(int limit) = 5;
 }

@@ -11,4 +11,7 @@
     <string name="threshold_label">Cerrar apps cuando la RAM libre baje de:</string>
     <string name="fast_animations_title">Animaciones del sistema</string>
     <string name="fast_animations_switch">Animaciones rápidas (0.5x)</string>
+    <string name="freeze_apps">Congelar apps inactivas</string>
+    <string name="unfreeze_apps">Descongelar todo</string>
+    <string name="top_memory_title">Apps que más RAM consumen</string>
 </resources>

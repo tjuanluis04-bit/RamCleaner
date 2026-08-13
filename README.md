@@ -1,50 +1,60 @@
 # RamCleaner
 
-App que usa Shizuku para forzar el cierre (force-stop) de apps de usuario en
-segundo plano, para liberar RAM.
+App que usa Shizuku para gestionar apps de usuario en segundo plano y
+liberar RAM.
 
 ## Funciones
 
-- **Botón manual**: cierra todas las apps de terceros y muestra cuántas se
-  cerraron y cuántos MB de RAM se liberaron.
-- **Lista blanca**: elige qué apps NUNCA se deben cerrar (ej. WhatsApp,
-  Spotify, tu launcher).
-- **Tile en el panel rápido**: agrega el tile "RamCleaner" a tu panel de
-  notificaciones (desliza dos veces desde arriba → editar tiles → arrástralo)
-  para limpiar sin abrir la app.
-- **Auto-activación por umbral (opcional)**: activa el switch en la app y
-  elige el % de RAM libre a partir del cual se dispara solo el force-stop.
-  Corre como servicio en primer plano con una notificación (obligatoria por
-  Android) mientras está activo.
+- **Cerrar todas las apps**: force-stop paralelo (4 a la vez) de apps de
+  terceros, con feedback de cuántas se cerraron y cuántos MB de RAM se
+  liberaron.
+- **Congelar apps inactivas / Descongelar todo**: mete a las apps elegibles
+  en el bucket "restricted" de App Standby (limita su actividad en segundo
+  plano) sin cerrarlas de golpe; reversible con un botón.
+- **Apps que más RAM consumen**: lista basada en `dumpsys meminfo`.
+- **Lista blanca**: apps que nunca se tocan.
+- **Tile en el panel rápido**.
+- **Auto-activación por umbral de RAM** (opcional, con notificación
+  mientras está activo).
+- **Animaciones rápidas**: pone la escala de animaciones del sistema a
+  0.5x.
+
+## Protecciones automáticas (siempre activas, sin configurar nada)
+
+- El launcher actual.
+- El teclado (IME) actual.
+- La app en primer plano en el momento exacto de actuar.
+- Google Play Services, Play Store y el Google Services Framework — en
+  algunos equipos estos aparecen como "de terceros" y cerrarlos causa
+  inestabilidad grave del sistema (tiles del panel rápido en "no
+  disponible", toques fantasma, "Google Play Services se detuvo").
+
+## Nota sobre cuánta RAM se libera
+
+Android usa a propósito la RAM libre para mantener apps recientes
+cacheadas — no es un desperdicio, es una función de rendimiento. No es
+posible ni deseable dejar la RAM "como nueva"; si se libera casi toda,
+reabrir apps se vuelve más lento porque Android tiene que recargarlas
+desde cero. Es normal que limpiezas sucesivas liberen cada vez menos: es
+señal de que ya hay poco corriendo, no de que la app dejó de funcionar.
 
 ## Cómo funciona por dentro
 
-- Usa la API de Shizuku con un **UserService**: un proceso aparte que corre
-  con la identidad de "shell" (o "root" si usas Sui), donde sí se pueden
-  ejecutar comandos privilegiados como `am force-stop`.
-- No usa `Shizuku.newProcess` porque está deprecado en las versiones
-  recientes de Shizuku.
-
-## Requisitos en el celular
-
-1. Tener Shizuku instalado y corriendo (vía ADB inalámbrico o root).
-2. Instalar este APK y darle el permiso cuando lo pida.
-3. Si activas el monitoreo automático en Android 13+, acepta el permiso de
-   notificaciones cuando se lo pida (es obligatorio para el servicio en
-   primer plano).
+Usa un **UserService** de Shizuku (proceso con identidad shell/root) para
+ejecutar comandos privilegiados (`am force-stop`, `am set-standby-bucket`,
+`settings put global`, `dumpsys meminfo`) sin pasar por
+`Shizuku.newProcess` (deprecado).
 
 ## Compilar con GitHub Actions
 
 1. Sube esta carpeta completa como repositorio en GitHub.
-2. Ve a la pestaña **Actions** del repo. El workflow `Build APK` corre solo
-   al hacer push a `main`, o puedes lanzarlo manualmente con
-   "Run workflow" (workflow_dispatch).
-3. Cuando termine, entra al run y descarga el artefacto
-   `RamCleaner-debug-apk` — ahí está el `app-debug.apk`.
+2. Pestaña **Actions** → workflow "Build APK" → correr manualmente o con
+   push a `main`.
+3. Descarga el artefacto `RamCleaner-debug-apk`.
 
 ## Notas
 
-- El `applicationId` es `com.example.ramcleaner`.
-- El intervalo de chequeo del monitoreo automático es cada 30 segundos
-  (`checkIntervalMs` en `RamMonitorService.kt`); se puede ajustar ahí si lo
-  quieres más o menos frecuente.
+- `applicationId`: `com.example.ramcleaner`.
+- La interfaz AIDL está en versión 3 (`ShizukuHelper.userServiceArgs`);
+  si agregas más métodos al `.aidl`, sube ese número para que Shizuku
+  reinicie el proceso privilegiado con el código nuevo.

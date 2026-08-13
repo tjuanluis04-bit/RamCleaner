@@ -38,6 +38,11 @@
             android:exported="false"
             android:label="@string/edit_whitelist" />
 
+        <activity
+            android:name=".TopMemoryActivity"
+            android:exported="false"
+            android:label="@string/top_memory_title" />
+
         <!-- Provider requerido por Shizuku para hablar con la app -->
         <provider
             android:name="rikka.shizuku.ShizukuProvider"
