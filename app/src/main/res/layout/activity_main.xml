@@ -11,6 +11,21 @@
         android:padding="32dp">
 
         <TextView
+            android:id="@+id/ramUsageText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="8dp"
+            android:text="RAM: —" />
+
+        <com.example.ramcleaner.RamGraphView
+            android:id="@+id/ramGraphView"
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            android:layout_marginBottom="24dp" />
+
+        <TextView
             android:id="@+id/statusText"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -32,6 +47,13 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
             android:text="@string/kill_all" />
+
+        <Button
+            android:id="@+id/closeSpecificButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:text="@string/close_specific_apps" />
 
         <Button
             android:id="@+id/freezeButton"

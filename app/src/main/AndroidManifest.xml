@@ -39,6 +39,11 @@
             android:label="@string/edit_whitelist" />
 
         <activity
+            android:name=".CloseAppsActivity"
+            android:exported="false"
+            android:label="@string/close_specific_apps" />
+
+        <activity
             android:name=".TopMemoryActivity"
             android:exported="false"
             android:label="@string/top_memory_title" />

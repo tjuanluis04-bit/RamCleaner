@@ -4,34 +4,34 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:padding="16dp"
-        android:text="@string/whitelist_instructions" />
-
     <EditText
         android:id="@+id/searchBox"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="12dp"
-        android:layout_marginBottom="8dp"
+        android:layout_margin="12dp"
         android:hint="@string/search_apps_hint"
         android:drawableStart="@android:drawable/ic_menu_search"
         android:drawablePadding="8dp"
         android:inputType="text"
         android:maxLines="1" />
 
+    <TextView
+        android:id="@+id/closeAppsStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="16dp"
+        android:paddingBottom="8dp" />
+
     <ListView
-        android:id="@+id/whitelistListView"
+        android:id="@+id/closeAppsListView"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1" />
 
     <Button
-        android:id="@+id/saveWhitelistButton"
+        android:id="@+id/closeSelectedButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/save_whitelist" />
+        android:text="@string/close_selected" />
 
 </LinearLayout>

@@ -92,6 +92,19 @@ class UserService : IUserService.Stub() {
         }
     }
 
+    override fun forceStopSpecific(packages: Array<String>): Int {
+        val counter = AtomicInteger(0)
+        runParallel(packages.toList()) { pkg ->
+            try {
+                val ok = Runtime.getRuntime().exec(arrayOf("am", "force-stop", pkg)).waitFor() == 0
+                if (ok) counter.incrementAndGet()
+            } catch (e: Exception) {
+                // ignorar
+            }
+        }
+        return counter.get()
+    }
+
     // ---------- helpers internos ----------
 
     private fun setStandbyBucketForEligible(whitelist: Array<String>, bucket: String): Int {

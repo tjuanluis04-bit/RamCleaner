@@ -14,4 +14,7 @@
     <string name="freeze_apps">Congelar apps inactivas</string>
     <string name="unfreeze_apps">Descongelar todo</string>
     <string name="top_memory_title">Apps que más RAM consumen</string>
+    <string name="close_specific_apps">Cerrar apps específicas</string>
+    <string name="search_apps_hint">Buscar app…</string>
+    <string name="close_selected">Cerrar seleccionadas</string>
 </resources>

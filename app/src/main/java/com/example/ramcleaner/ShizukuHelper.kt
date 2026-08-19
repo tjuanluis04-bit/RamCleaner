@@ -17,7 +17,7 @@ object ShizukuHelper {
         .daemon(false)
         .processNameSuffix("service")
         .debuggable(false)
-        .version(3)
+        .version(4)
 
     fun hasPermission(): Boolean {
         return try {
@@ -47,7 +47,7 @@ object ShizukuHelper {
      * agregarlas manualmente: el launcher actual, el teclado actual, y
      * los paquetes críticos de Google.
      */
-    private fun getAutoProtectedPackages(context: Context): Set<String> {
+    fun getAutoProtectedPackages(context: Context): Set<String> {
         val protected = mutableSetOf<String>()
         protected.addAll(CRITICAL_PACKAGES)
         try {
@@ -206,6 +206,34 @@ object ShizukuHelper {
                     onResult(parsed, null)
                 } catch (e: Exception) {
                     onResult(null, e.message ?: "error desconocido")
+                } finally {
+                    try {
+                        Shizuku.unbindUserService(args, this, false)
+                    } catch (e: Exception) {
+                        // ignorar
+                    }
+                }
+            }
+
+            override fun onServiceDisconnected(name: ComponentName?) {}
+        }
+        Shizuku.bindUserService(args, connection)
+    }
+
+    /** Cierra solo los paquetes indicados explícitamente (para el buscador de "cerrar apps específicas"). */
+    fun forceStopSpecific(context: Context, packages: List<String>, onResult: (count: Int, error: String?) -> Unit) {
+        if (!hasPermission()) {
+            onResult(-1, "Sin permiso de Shizuku")
+            return
+        }
+        val args = userServiceArgs(context)
+        val connection = object : ServiceConnection {
+            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+                try {
+                    val service = IUserService.Stub.asInterface(binder)
+                    onResult(service.forceStopSpecific(packages.toTypedArray()), null)
+                } catch (e: Exception) {
+                    onResult(-1, e.message ?: "error desconocido")
                 } finally {
                     try {
                         Shizuku.unbindUserService(args, this, false)

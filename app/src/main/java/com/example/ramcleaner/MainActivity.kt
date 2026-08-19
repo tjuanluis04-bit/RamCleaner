@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.widget.Button
 import android.widget.SeekBar
@@ -26,6 +28,17 @@ class MainActivity : AppCompatActivity() {
     private lateinit var thresholdSeekBar: SeekBar
     private lateinit var thresholdValueText: TextView
     private lateinit var fastAnimationsSwitch: Switch
+    private lateinit var ramGraphView: RamGraphView
+    private lateinit var ramUsageText: TextView
+
+    private val ramUpdateHandler = Handler(Looper.getMainLooper())
+    private val ramUpdateIntervalMs = 1500L
+    private val ramUpdateRunnable = object : Runnable {
+        override fun run() {
+            updateRamGraph()
+            ramUpdateHandler.postDelayed(this, ramUpdateIntervalMs)
+        }
+    }
 
     private val permissionListener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
         if (requestCode == permissionRequestCode) {
@@ -43,9 +56,12 @@ class MainActivity : AppCompatActivity() {
 
         Shizuku.addRequestPermissionResultListener(permissionListener)
 
+        ramGraphView = findViewById(R.id.ramGraphView)
+        ramUsageText = findViewById(R.id.ramUsageText)
         statusText = findViewById(R.id.statusText)
         val requestButton = findViewById<Button>(R.id.requestPermissionButton)
         val killButton = findViewById<Button>(R.id.killAllButton)
+        val closeSpecificButton = findViewById<Button>(R.id.closeSpecificButton)
         val whitelistButton = findViewById<Button>(R.id.whitelistButton)
         val freezeButton = findViewById<Button>(R.id.freezeButton)
         val unfreezeButton = findViewById<Button>(R.id.unfreezeButton)
@@ -57,6 +73,9 @@ class MainActivity : AppCompatActivity() {
 
         requestButton.setOnClickListener { requestShizukuPermission() }
         killButton.setOnClickListener { performForceStop() }
+        closeSpecificButton.setOnClickListener {
+            startActivity(Intent(this, CloseAppsActivity::class.java))
+        }
         whitelistButton.setOnClickListener {
             startActivity(Intent(this, WhitelistActivity::class.java))
         }
@@ -70,9 +89,35 @@ class MainActivity : AppCompatActivity() {
         setupFastAnimationsControl()
     }
 
+    override fun onResume() {
+        super.onResume()
+        ramUpdateHandler.post(ramUpdateRunnable)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        ramUpdateHandler.removeCallbacks(ramUpdateRunnable)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         Shizuku.removeRequestPermissionResultListener(permissionListener)
+    }
+
+    // ---------- Gráfico de RAM en tiempo real ----------
+
+    private fun updateRamGraph() {
+        val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+        val mi = ActivityManager.MemoryInfo()
+        am.getMemoryInfo(mi)
+
+        val usedBytes = mi.totalMem - mi.availMem
+        val percent = (usedBytes * 100f / mi.totalMem)
+        ramGraphView.addSample(percent)
+
+        val usedGb = usedBytes / (1024.0 * 1024 * 1024)
+        val totalGb = mi.totalMem / (1024.0 * 1024 * 1024)
+        ramUsageText.text = String.format("RAM: %.0f%% usada (%.1f / %.1f GB)", percent, usedGb, totalGb)
     }
 
     // ---------- Permiso de Shizuku ----------
