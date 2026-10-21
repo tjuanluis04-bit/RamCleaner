@@ -1,98 +1,82 @@
 package com.example.ramcleaner
 
 import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
-import android.widget.ArrayAdapter
-import android.widget.Button
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.BaseAdapter
 import android.widget.EditText
 import android.widget.ListView
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 
 class CloseAppsActivity : AppCompatActivity() {
 
-    private lateinit var searchBox: EditText
-    private lateinit var listView: ListView
-    private lateinit var statusText: TextView
+    private data class AppEntry(val packageName: String, val label: String)
 
-    private lateinit var allApps: List<ApplicationInfo>
-    private var filteredApps: List<ApplicationInfo> = emptyList()
-    private val checkedPackages = mutableSetOf<String>()
+    private lateinit var allApps: List<AppEntry>
+    private var filteredApps: List<AppEntry> = emptyList()
+    private lateinit var adapter: Adapter
+    private lateinit var textStatus: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_close_apps)
 
-        searchBox = findViewById(R.id.searchBox)
-        listView = findViewById(R.id.closeAppsListView)
-        statusText = findViewById(R.id.closeAppsStatus)
-        val closeButton = findViewById<Button>(R.id.closeSelectedButton)
+        textStatus = findViewById(R.id.textStatus)
+        val listView = findViewById<ListView>(R.id.listApps)
+        val editSearch = findViewById<EditText>(R.id.editSearch)
 
         val pm = packageManager
-        val protectedPkgs = ShizukuHelper.getAutoProtectedPackages(this)
-        allApps = pm.getInstalledApplications(0)
-            .filter {
-                (it.flags and ApplicationInfo.FLAG_SYSTEM) == 0 &&
-                    it.packageName != packageName &&
-                    !protectedPkgs.contains(it.packageName)
+        allApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+            .filter { it.packageName != packageName }
+            .map { info: ApplicationInfo ->
+                AppEntry(info.packageName, pm.getApplicationLabel(info).toString())
             }
-            .sortedBy { pm.getApplicationLabel(it).toString().lowercase() }
+            .sortedBy { it.label.lowercase() }
 
-        listView.choiceMode = ListView.CHOICE_MODE_MULTIPLE
-        applyFilter("")
+        filteredApps = allApps
+        adapter = Adapter()
+        listView.adapter = adapter
 
-        listView.setOnItemClickListener { _, _, position, _ ->
-            val pkg = filteredApps[position].packageName
-            if (listView.isItemChecked(position)) {
-                checkedPackages.add(pkg)
-            } else {
-                checkedPackages.remove(pkg)
-            }
-        }
-
-        searchBox.addTextChangedListener(object : TextWatcher {
-            override fun afterTextChanged(s: Editable?) {
-                applyFilter(s?.toString().orEmpty())
-            }
+        editSearch.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-        })
-
-        closeButton.setOnClickListener {
-            if (checkedPackages.isEmpty()) {
-                Toast.makeText(this, "Selecciona al menos una app", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            statusText.text = "Cerrando…"
-            val toClose = checkedPackages.toList()
-            ShizukuHelper.forceStopSpecific(this, toClose) { count, error ->
-                runOnUiThread {
-                    if (error != null) {
-                        statusText.text = "Error: $error"
-                    } else {
-                        statusText.text = "$count apps cerradas"
-                        checkedPackages.clear()
-                        applyFilter(searchBox.text?.toString().orEmpty())
-                    }
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val q = s?.toString()?.trim()?.lowercase().orEmpty()
+                filteredApps = if (q.isEmpty()) allApps else allApps.filter {
+                    it.label.lowercase().contains(q) || it.packageName.lowercase().contains(q)
                 }
+                adapter.notifyDataSetChanged()
             }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+    }
+
+    private fun closeApp(entry: AppEntry) {
+        textStatus.text = "Cerrando ${entry.label}..."
+        ShizukuHelper.forceStopSpecific(this, listOf(entry.packageName)) { count, error ->
+            textStatus.text = if (error != null) "✗ $error" else "✓ ${entry.label} cerrada"
         }
     }
 
-    private fun applyFilter(query: String) {
-        val pm = packageManager
-        filteredApps = if (query.isBlank()) {
-            allApps
-        } else {
-            allApps.filter { pm.getApplicationLabel(it).toString().contains(query, ignoreCase = true) }
-        }
-        val labels = filteredApps.map { pm.getApplicationLabel(it).toString() }
-        listView.adapter = ArrayAdapter(this, android.R.layout.simple_list_item_multiple_choice, labels)
-        filteredApps.forEachIndexed { index, app ->
-            listView.setItemChecked(index, checkedPackages.contains(app.packageName))
+    private inner class Adapter : BaseAdapter() {
+        override fun getCount(): Int = filteredApps.size
+        override fun getItem(position: Int): Any = filteredApps[position]
+        override fun getItemId(position: Int): Long = position.toLong()
+
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+            val view = convertView ?: LayoutInflater.from(this@CloseAppsActivity)
+                .inflate(android.R.layout.simple_list_item_1, parent, false)
+            val entry = filteredApps[position]
+            val textView = view.findViewById<TextView>(android.R.id.text1)
+            textView.text = "${entry.label}\n${entry.packageName}"
+            textView.textSize = 14f
+            view.setOnClickListener { closeApp(entry) }
+            return view
         }
     }
 }

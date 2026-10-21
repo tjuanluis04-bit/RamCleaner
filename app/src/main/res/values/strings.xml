@@ -1,20 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">RamCleaner</string>
-    <string name="status_initial">Listo</string>
-    <string name="request_permission">Pedir permiso a Shizuku</string>
-    <string name="kill_all">Cerrar todas las apps</string>
     <string name="edit_whitelist">Elegir apps a excluir</string>
-    <string name="whitelist_instructions">Marca las apps que NO quieres que se cierren nunca (ej. WhatsApp, Spotify, tu launcher)</string>
-    <string name="save_whitelist">Guardar</string>
-    <string name="auto_mode_title">Auto-activación por RAM</string>
-    <string name="auto_mode_switch">Activar monitoreo automático</string>
-    <string name="threshold_label">Cerrar apps cuando la RAM libre baje de:</string>
-    <string name="fast_animations_title">Animaciones del sistema</string>
-    <string name="fast_animations_switch">Animaciones rápidas (0.5x)</string>
-    <string name="freeze_apps">Congelar apps inactivas</string>
-    <string name="unfreeze_apps">Descongelar todo</string>
-    <string name="top_memory_title">Apps que más RAM consumen</string>
     <string name="close_specific_apps">Cerrar apps específicas</string>
-    <string name="search_apps_hint">Buscar app…</string>
-    <string name="close_selected">Cerrar seleccionadas</string>
+    <string name="top_memory_title">Apps que más RAM consumen</string>
+    <string name="clean_now">Limpiar ahora</string>
+    <string name="loading">Cargando...</string>
+    <string name="search_hint">Buscar app...</string>
 </resources>

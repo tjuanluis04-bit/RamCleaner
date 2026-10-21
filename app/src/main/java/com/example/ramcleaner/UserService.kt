@@ -1,5 +1,6 @@
 package com.example.ramcleaner
 
+import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -61,37 +62,6 @@ class UserService : IUserService.Stub() {
         return setStandbyBucketForEligible(whitelist, "active")
     }
 
-    override fun getTopMemoryUsage(limit: Int): String {
-        return try {
-            val proc = Runtime.getRuntime().exec(arrayOf("sh", "-c", "dumpsys meminfo"))
-            val output = proc.inputStream.bufferedReader().readText()
-            proc.waitFor()
-
-            val startIdx = output.indexOf("Total PSS by process:")
-            if (startIdx == -1) return ""
-            val section = output.substring(startIdx)
-            val regex = Regex("""^\s*([\d,]+)K:\s+([a-zA-Z0-9_.]+)""")
-
-            val result = StringBuilder()
-            var count = 0
-            for (rawLine in section.lineSequence().drop(1)) {
-                if (count >= limit) break
-                val line = rawLine.trimEnd()
-                if (line.isBlank()) continue
-                if (!line.trimStart().firstOrNull().let { it != null && (it.isDigit()) }) break
-                val m = regex.find(line) ?: continue
-                val kb = m.groupValues[1].replace(",", "").toLongOrNull() ?: continue
-                val pkg = m.groupValues[2]
-                if (pkg == myPackage) continue
-                result.append(pkg).append(":").append(kb).append("\n")
-                count++
-            }
-            result.toString()
-        } catch (e: Exception) {
-            ""
-        }
-    }
-
     override fun forceStopSpecific(packages: Array<String>): Int {
         val counter = AtomicInteger(0)
         runParallel(packages.toList()) { pkg ->
@@ -103,6 +73,63 @@ class UserService : IUserService.Stub() {
             }
         }
         return counter.get()
+    }
+
+    /**
+     * Versión RÁPIDA: antes usaba "dumpsys meminfo", que calcula PSS exacto
+     * para cada proceso y puede tardar varios segundos (o mucho más en
+     * equipos con muchas apps) porque recorre regiones de memoria compartida
+     * una por una. Ahora lee directamente /proc/<pid>/status (campo VmRSS),
+     * que es una simple lectura de archivo — sin exec, sin dumpsys — y
+     * normalmente termina en milisegundos. El costo es que RSS no es tan
+     * exacto como PSS (puede contar un poco de memoria compartida de más),
+     * pero para "qué app está usando más RAM ahora" es más que suficiente
+     * y la diferencia de velocidad es enorme.
+     */
+    override fun getTopMemoryUsage(limit: Int): String {
+        return try {
+            val procDir = File("/proc")
+            val pidDirs = procDir.listFiles { f -> f.isDirectory && f.name.toIntOrNull() != null }
+                ?: return ""
+
+            val totals = HashMap<String, Long>()
+
+            for (pidDir in pidDirs) {
+                try {
+                    val cmdlineFile = File(pidDir, "cmdline")
+                    if (!cmdlineFile.exists()) continue
+                    val rawCmdline = cmdlineFile.readBytes().toString(Charsets.ISO_8859_1)
+                    val cmdline = rawCmdline.trim('\u0000', ' ')
+                    if (cmdline.isBlank() || !cmdline.contains('.')) continue
+
+                    val statusFile = File(pidDir, "status")
+                    if (!statusFile.exists()) continue
+
+                    var rssKb: Long? = null
+                    statusFile.forEachLine { line ->
+                        if (rssKb == null && line.startsWith("VmRSS:")) {
+                            rssKb = line.removePrefix("VmRSS:").trim().removeSuffix("kB").trim().toLongOrNull()
+                        }
+                    }
+                    val kb = rssKb ?: continue
+
+                    // "pkg:proceso_secundario" -> nos quedamos con el paquete base
+                    val pkg = cmdline.substringBefore(':')
+                    if (pkg == myPackage) continue
+
+                    totals[pkg] = (totals[pkg] ?: 0L) + kb
+                } catch (e: Exception) {
+                    // el proceso puede haber muerto entre el listado y la lectura; se ignora
+                }
+            }
+
+            totals.entries
+                .sortedByDescending { it.value }
+                .take(limit)
+                .joinToString("\n") { "${it.key}:${it.value}" }
+        } catch (e: Exception) {
+            ""
+        }
     }
 
     // ---------- helpers internos ----------
@@ -136,11 +163,6 @@ class UserService : IUserService.Stub() {
         }
     }
 
-    /**
-     * Ejecuta "action" para cada paquete en paralelo (4 hilos a la vez) en
-     * vez de uno por uno con pausas — esto es lo que hace que cerrar/congelar
-     * todas las apps sea notablemente más rápido.
-     */
     private fun runParallel(packages: List<String>, action: (String) -> Unit) {
         if (packages.isEmpty()) return
         val pool = Executors.newFixedThreadPool(4)
@@ -152,11 +174,6 @@ class UserService : IUserService.Stub() {
         }
     }
 
-    /**
-     * Usa "dumpsys window" (disponible porque este proceso corre con
-     * privilegios de shell) para saber qué app está en primer plano ahora
-     * mismo, y así nunca cerrarla/congelarla por accidente.
-     */
     private fun getForegroundPackage(): String? {
         return try {
             val proc = Runtime.getRuntime().exec(arrayOf("sh", "-c", "dumpsys window | grep mCurrentFocus"))

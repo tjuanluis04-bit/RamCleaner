@@ -1,102 +1,82 @@
 package com.example.ramcleaner
 
-import android.Manifest
-import android.app.ActivityManager
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.provider.Settings
 import android.widget.Button
 import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import rikka.shizuku.Shizuku
 
 class MainActivity : AppCompatActivity() {
 
-    private val permissionRequestCode = 1001
-    private val notificationPermissionRequestCode = 2001
-
-    private lateinit var statusText: TextView
-    private lateinit var autoModeSwitch: Switch
-    private lateinit var thresholdSeekBar: SeekBar
-    private lateinit var thresholdValueText: TextView
-    private lateinit var fastAnimationsSwitch: Switch
+    private lateinit var textPermissionStatus: TextView
+    private lateinit var textRamPercent: TextView
+    private lateinit var textResult: TextView
     private lateinit var ramGraphView: RamGraphView
-    private lateinit var ramUsageText: TextView
+    private lateinit var switchAutoEnabled: Switch
+    private lateinit var textThresholdValue: TextView
+    private lateinit var seekBarThreshold: SeekBar
 
-    private val ramUpdateHandler = Handler(Looper.getMainLooper())
-    private val ramUpdateIntervalMs = 1500L
-    private val ramUpdateRunnable = object : Runnable {
-        override fun run() {
-            updateRamGraph()
-            ramUpdateHandler.postDelayed(this, ramUpdateIntervalMs)
-        }
-    }
-
-    private val permissionListener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
-        if (requestCode == permissionRequestCode) {
-            if (grantResult == PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(this, "Permiso de Shizuku concedido", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "Permiso de Shizuku denegado", Toast.LENGTH_SHORT).show()
-            }
-        }
+    private val permissionListener = Shizuku.OnRequestPermissionResultListener { _, grantResult ->
+        updatePermissionStatus()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        Shizuku.addRequestPermissionResultListener(permissionListener)
-
+        textPermissionStatus = findViewById(R.id.textPermissionStatus)
+        textRamPercent = findViewById(R.id.textRamPercent)
+        textResult = findViewById(R.id.textResult)
         ramGraphView = findViewById(R.id.ramGraphView)
-        ramUsageText = findViewById(R.id.ramUsageText)
-        statusText = findViewById(R.id.statusText)
-        val requestButton = findViewById<Button>(R.id.requestPermissionButton)
-        val killButton = findViewById<Button>(R.id.killAllButton)
-        val closeSpecificButton = findViewById<Button>(R.id.closeSpecificButton)
-        val whitelistButton = findViewById<Button>(R.id.whitelistButton)
-        val freezeButton = findViewById<Button>(R.id.freezeButton)
-        val unfreezeButton = findViewById<Button>(R.id.unfreezeButton)
-        val topMemoryButton = findViewById<Button>(R.id.topMemoryButton)
-        autoModeSwitch = findViewById(R.id.autoModeSwitch)
-        thresholdSeekBar = findViewById(R.id.thresholdSeekBar)
-        thresholdValueText = findViewById(R.id.thresholdValueText)
-        fastAnimationsSwitch = findViewById(R.id.fastAnimationsSwitch)
+        switchAutoEnabled = findViewById(R.id.switchAutoEnabled)
+        textThresholdValue = findViewById(R.id.textThresholdValue)
+        seekBarThreshold = findViewById(R.id.seekBarThreshold)
 
-        requestButton.setOnClickListener { requestShizukuPermission() }
-        killButton.setOnClickListener { performForceStop() }
-        closeSpecificButton.setOnClickListener {
-            startActivity(Intent(this, CloseAppsActivity::class.java))
+        ramGraphView.percentText = { percent ->
+            textRamPercent.text = "$percent%"
         }
-        whitelistButton.setOnClickListener {
+
+        findViewById<Button>(R.id.buttonCleanNow).setOnClickListener { cleanNow() }
+        findViewById<Button>(R.id.buttonWhitelist).setOnClickListener {
             startActivity(Intent(this, WhitelistActivity::class.java))
         }
-        freezeButton.setOnClickListener { performFreeze() }
-        unfreezeButton.setOnClickListener { performUnfreeze() }
-        topMemoryButton.setOnClickListener {
+        findViewById<Button>(R.id.buttonCloseSpecific).setOnClickListener {
+            startActivity(Intent(this, CloseAppsActivity::class.java))
+        }
+        findViewById<Button>(R.id.buttonTopMemory).setOnClickListener {
             startActivity(Intent(this, TopMemoryActivity::class.java))
         }
 
-        setupAutoModeControls()
-        setupFastAnimationsControl()
-    }
+        // Umbral: SeekBar va de 0..60, representa 40%..100% (pasos de 1%)
+        val savedThreshold = PrefsHelper.getThreshold(this)
+        seekBarThreshold.progress = (savedThreshold - 40).coerceIn(0, 60)
+        textThresholdValue.text = "Umbral: ${savedThreshold}%"
 
-    override fun onResume() {
-        super.onResume()
-        ramUpdateHandler.post(ramUpdateRunnable)
-    }
+        switchAutoEnabled.isChecked = PrefsHelper.isAutoEnabled(this)
+        switchAutoEnabled.setOnCheckedChangeListener { _, isChecked ->
+            PrefsHelper.setAutoEnabled(this, isChecked)
+            if (isChecked) {
+                RamMonitorService.start(this)
+            } else {
+                RamMonitorService.stop(this)
+            }
+        }
 
-    override fun onPause() {
-        super.onPause()
-        ramUpdateHandler.removeCallbacks(ramUpdateRunnable)
+        seekBarThreshold.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val threshold = 40 + progress
+                textThresholdValue.text = "Umbral: ${threshold}%"
+                if (fromUser) PrefsHelper.setThreshold(this@MainActivity, threshold)
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        Shizuku.addRequestPermissionResultListener(permissionListener)
+        ensurePermission()
     }
 
     override fun onDestroy() {
@@ -104,145 +84,42 @@ class MainActivity : AppCompatActivity() {
         Shizuku.removeRequestPermissionResultListener(permissionListener)
     }
 
-    // ---------- Gráfico de RAM en tiempo real ----------
-
-    private fun updateRamGraph() {
-        val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
-        val mi = ActivityManager.MemoryInfo()
-        am.getMemoryInfo(mi)
-
-        val usedBytes = mi.totalMem - mi.availMem
-        val percent = (usedBytes * 100f / mi.totalMem)
-        ramGraphView.addSample(percent)
-
-        val usedGb = usedBytes / (1024.0 * 1024 * 1024)
-        val totalGb = mi.totalMem / (1024.0 * 1024 * 1024)
-        ramUsageText.text = String.format("RAM: %.0f%% usada (%.1f / %.1f GB)", percent, usedGb, totalGb)
+    override fun onResume() {
+        super.onResume()
+        updatePermissionStatus()
     }
 
-    // ---------- Permiso de Shizuku ----------
-
-    private fun requestShizukuPermission() {
-        if (!Shizuku.pingBinder()) {
-            Toast.makeText(this, "Shizuku no está corriendo. Ábrelo primero.", Toast.LENGTH_LONG).show()
+    private fun ensurePermission() {
+        if (!ShizukuHelper.isShizukuAlive()) {
+            textPermissionStatus.text = "⚠ Shizuku no está corriendo. Ábrelo y activa el servicio (ADB inalámbrico o root)."
             return
         }
-        if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(this, "Ya tienes el permiso", Toast.LENGTH_SHORT).show()
+        if (!ShizukuHelper.hasPermission()) {
+            try {
+                Shizuku.requestPermission(0)
+            } catch (e: Exception) {
+                textPermissionStatus.text = "⚠ No se pudo pedir permiso de Shizuku."
+            }
         } else {
-            Shizuku.requestPermission(permissionRequestCode)
+            updatePermissionStatus()
         }
     }
 
-    // ---------- Botón manual: cerrar todas ----------
+    private fun updatePermissionStatus() {
+        textPermissionStatus.text = when {
+            !ShizukuHelper.isShizukuAlive() -> "⚠ Shizuku no está corriendo"
+            !ShizukuHelper.hasPermission() -> "⚠ Falta permiso de Shizuku"
+            else -> "✓ Shizuku conectado"
+        }
+    }
 
-    private fun performForceStop() {
-        val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
-        val memBefore = ActivityManager.MemoryInfo()
-        am.getMemoryInfo(memBefore)
-
-        statusText.text = "Cerrando apps…"
-
+    private fun cleanNow() {
+        textResult.text = "Cerrando apps..."
         ShizukuHelper.runForceStop(this) { count, error ->
-            runOnUiThread {
-                if (error != null) {
-                    statusText.text = "Error: $error"
-                    return@runOnUiThread
-                }
-                val memAfter = ActivityManager.MemoryInfo()
-                am.getMemoryInfo(memAfter)
-                val freedMb = (memAfter.availMem - memBefore.availMem) / (1024 * 1024)
-                val freedText = if (freedMb > 0) "$freedMb MB liberados" else "sin cambio medible en RAM libre"
-                statusText.text = "Se cerraron $count apps · $freedText"
-            }
-        }
-    }
-
-    // ---------- Congelar / descongelar ----------
-
-    private fun performFreeze() {
-        statusText.text = "Congelando apps inactivas…"
-        ShizukuHelper.freezeInactiveApps(this) { count, error ->
-            runOnUiThread {
-                statusText.text = if (error != null) "Error: $error" else "$count apps congeladas"
-            }
-        }
-    }
-
-    private fun performUnfreeze() {
-        statusText.text = "Descongelando…"
-        ShizukuHelper.unfreezeApps(this) { count, error ->
-            runOnUiThread {
-                statusText.text = if (error != null) "Error: $error" else "$count apps descongeladas"
-            }
-        }
-    }
-
-    // ---------- Auto-activación por umbral ----------
-
-    private fun setupAutoModeControls() {
-        val threshold = PrefsHelper.getThreshold(this)
-        thresholdSeekBar.max = PrefsHelper.MAX_THRESHOLD - PrefsHelper.MIN_THRESHOLD
-        thresholdSeekBar.progress = threshold - PrefsHelper.MIN_THRESHOLD
-        thresholdValueText.text = "$threshold%"
-        autoModeSwitch.isChecked = PrefsHelper.isAutoEnabled(this)
-
-        thresholdSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                val percent = progress + PrefsHelper.MIN_THRESHOLD
-                thresholdValueText.text = "$percent%"
-                if (fromUser) {
-                    PrefsHelper.setThreshold(this@MainActivity, percent)
-                    if (autoModeSwitch.isChecked) {
-                        startForegroundService(Intent(this@MainActivity, RamMonitorService::class.java))
-                    }
-                }
-            }
-            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
-            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
-        })
-
-        autoModeSwitch.setOnCheckedChangeListener { _, isChecked ->
-            PrefsHelper.setAutoEnabled(this, isChecked)
-            if (isChecked) {
-                ensureNotificationPermission()
-                startForegroundService(Intent(this, RamMonitorService::class.java))
-                Toast.makeText(this, "Monitoreo automático activado", Toast.LENGTH_SHORT).show()
+            textResult.text = if (error != null) {
+                "✗ $error"
             } else {
-                stopService(Intent(this, RamMonitorService::class.java))
-                Toast.makeText(this, "Monitoreo automático desactivado", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    private fun ensureNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED
-            ) {
-                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), notificationPermissionRequestCode)
-            }
-        }
-    }
-
-    // ---------- Animaciones rápidas ----------
-
-    private fun setupFastAnimationsControl() {
-        val currentScale = Settings.Global.getFloat(contentResolver, Settings.Global.WINDOW_ANIMATION_SCALE, 1f)
-        fastAnimationsSwitch.isChecked = currentScale < 0.99f
-
-        fastAnimationsSwitch.setOnCheckedChangeListener { _, isChecked ->
-            val scale = if (isChecked) 0.5f else 1.0f
-            ShizukuHelper.setAnimationScale(this, scale) { success, error ->
-                runOnUiThread {
-                    if (success) {
-                        val msg = if (isChecked) "Animaciones a 0.5x" else "Animaciones normales"
-                        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(this, "Error: $error", Toast.LENGTH_SHORT).show()
-                        fastAnimationsSwitch.isChecked = !isChecked
-                    }
-                }
+                "✓ $count apps cerradas"
             }
         }
     }

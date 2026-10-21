@@ -5,11 +5,24 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.provider.Settings
+import java.util.concurrent.atomic.AtomicBoolean
 import rikka.shizuku.Shizuku
 
 object ShizukuHelper {
+
+    /**
+     * Tiempo máximo de espera por una respuesta del UserService antes de
+     * darla por fallida. Antes, si Shizuku se desconectaba a medio camino
+     * (ADB inalámbrico que se cae, el servicio muere, etc.), la llamada se
+     * quedaba esperando para siempre sin avisar nada — eso es lo que hacía
+     * que el tile pareciera "no responder" o que la pantalla de RAM se
+     * quedara en "Cargando..." indefinidamente.
+     */
+    private const val TIMEOUT_MS = 8000L
 
     private fun userServiceArgs(context: Context) = Shizuku.UserServiceArgs(
         ComponentName(context.packageName, UserService::class.java.name)
@@ -27,14 +40,15 @@ object ShizukuHelper {
         }
     }
 
-    /**
-     * Paquetes que jamás se deben cerrar ni restringir, sin importar lo
-     * que reporte "pm list packages -3". En algunos equipos Google Play
-     * Services / Play Store aparecen ahí como si fueran de terceros, y
-     * forzar su cierre es lo que provoca que se caiga la interfaz del
-     * sistema (tiles en "no disponible", toques fantasma, "Google Play
-     * Services se detuvo").
-     */
+    /** true si Shizuku está corriendo (ADB inalámbrico / root activo). */
+    fun isShizukuAlive(): Boolean {
+        return try {
+            Shizuku.pingBinder()
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     private val CRITICAL_PACKAGES = setOf(
         "com.google.android.gms",
         "com.google.android.gsf",
@@ -42,11 +56,6 @@ object ShizukuHelper {
         "com.google.android.gsf.login"
     )
 
-    /**
-     * Apps que siempre se deben proteger sin que el usuario tenga que
-     * agregarlas manualmente: el launcher actual, el teclado actual, y
-     * los paquetes críticos de Google.
-     */
     fun getAutoProtectedPackages(context: Context): Set<String> {
         val protected = mutableSetOf<String>()
         protected.addAll(CRITICAL_PACKAGES)
@@ -70,181 +79,115 @@ object ShizukuHelper {
         return (PrefsHelper.getWhitelist(context) + getAutoProtectedPackages(context)).toTypedArray()
     }
 
-    /** Se conecta al UserService, ejecuta forceStopAll respetando la whitelist. */
-    fun runForceStop(context: Context, onResult: (count: Int, error: String?) -> Unit) {
-        if (!hasPermission()) {
-            onResult(-1, "Sin permiso de Shizuku")
+    /**
+     * Envoltura genérica: conecta al UserService y ejecuta "block". Pase lo
+     * que pase (éxito, error, o que nunca llegue respuesta) "onResult" se
+     * llama UNA sola vez, antes de TIMEOUT_MS. Así ningún llamador (tile,
+     * widget, pantallas) se queda esperando para siempre.
+     */
+    private fun <T> callService(
+        context: Context,
+        timeoutValue: T,
+        onResult: (T, String?) -> Unit,
+        block: (IUserService) -> Pair<T, String?>
+    ) {
+        val mainHandler = Handler(Looper.getMainLooper())
+        val resolved = AtomicBoolean(false)
+
+        fun finish(value: T, error: String?) {
+            if (resolved.compareAndSet(false, true)) {
+                mainHandler.post { onResult(value, error) }
+            }
+        }
+
+        if (!isShizukuAlive()) {
+            finish(timeoutValue, "Shizuku no está corriendo (¿se desconectó el ADB inalámbrico?)")
             return
         }
+        if (!hasPermission()) {
+            finish(timeoutValue, "Sin permiso de Shizuku")
+            return
+        }
+
         val args = userServiceArgs(context)
-        val connection = object : ServiceConnection {
+        lateinit var connection: ServiceConnection
+        connection = object : ServiceConnection {
             override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
                 try {
                     val service = IUserService.Stub.asInterface(binder)
-                    onResult(service.forceStopAll(fullWhitelist(context)), null)
+                    val (value, error) = block(service)
+                    finish(value, error)
                 } catch (e: Exception) {
-                    onResult(-1, e.message ?: "error desconocido")
+                    finish(timeoutValue, e.message ?: "error desconocido")
                 } finally {
                     try {
-                        Shizuku.unbindUserService(args, this, false)
+                        Shizuku.unbindUserService(args, connection, false)
                     } catch (e: Exception) {
                         // ignorar
                     }
                 }
             }
 
-            override fun onServiceDisconnected(name: ComponentName?) {}
+            override fun onServiceDisconnected(name: ComponentName?) {
+                finish(timeoutValue, "El servicio privilegiado se desconectó")
+            }
         }
-        Shizuku.bindUserService(args, connection)
+
+        mainHandler.postDelayed({
+            finish(timeoutValue, "Tiempo de espera agotado (¿Shizuku sigue activo?)")
+        }, TIMEOUT_MS)
+
+        try {
+            Shizuku.bindUserService(args, connection)
+        } catch (e: Exception) {
+            finish(timeoutValue, e.message ?: "no se pudo conectar con Shizuku")
+        }
+    }
+
+    fun runForceStop(context: Context, onResult: (count: Int, error: String?) -> Unit) {
+        callService(context, -1, onResult) { service ->
+            service.forceStopAll(fullWhitelist(context)) to null
+        }
     }
 
     fun setAnimationScale(context: Context, scale: Float, onResult: (success: Boolean, error: String?) -> Unit) {
-        if (!hasPermission()) {
-            onResult(false, "Sin permiso de Shizuku")
-            return
+        callService(context, false, onResult) { service ->
+            service.setAnimationScale(scale)
+            true to null
         }
-        val args = userServiceArgs(context)
-        val connection = object : ServiceConnection {
-            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-                try {
-                    val service = IUserService.Stub.asInterface(binder)
-                    service.setAnimationScale(scale)
-                    onResult(true, null)
-                } catch (e: Exception) {
-                    onResult(false, e.message ?: "error desconocido")
-                } finally {
-                    try {
-                        Shizuku.unbindUserService(args, this, false)
-                    } catch (e: Exception) {
-                        // ignorar
-                    }
-                }
-            }
-
-            override fun onServiceDisconnected(name: ComponentName?) {}
-        }
-        Shizuku.bindUserService(args, connection)
     }
 
-    /** Congela (restricted standby bucket) todas las apps elegibles, sin cerrarlas. */
     fun freezeInactiveApps(context: Context, onResult: (count: Int, error: String?) -> Unit) {
-        if (!hasPermission()) {
-            onResult(-1, "Sin permiso de Shizuku")
-            return
+        callService(context, -1, onResult) { service ->
+            service.freezeInactiveApps(fullWhitelist(context)) to null
         }
-        val args = userServiceArgs(context)
-        val connection = object : ServiceConnection {
-            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-                try {
-                    val service = IUserService.Stub.asInterface(binder)
-                    onResult(service.freezeInactiveApps(fullWhitelist(context)), null)
-                } catch (e: Exception) {
-                    onResult(-1, e.message ?: "error desconocido")
-                } finally {
-                    try {
-                        Shizuku.unbindUserService(args, this, false)
-                    } catch (e: Exception) {
-                        // ignorar
-                    }
-                }
-            }
-
-            override fun onServiceDisconnected(name: ComponentName?) {}
-        }
-        Shizuku.bindUserService(args, connection)
     }
 
-    /** Revierte el congelado de todas las apps elegibles. */
     fun unfreezeApps(context: Context, onResult: (count: Int, error: String?) -> Unit) {
-        if (!hasPermission()) {
-            onResult(-1, "Sin permiso de Shizuku")
-            return
+        callService(context, -1, onResult) { service ->
+            service.unfreezeApps(fullWhitelist(context)) to null
         }
-        val args = userServiceArgs(context)
-        val connection = object : ServiceConnection {
-            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-                try {
-                    val service = IUserService.Stub.asInterface(binder)
-                    onResult(service.unfreezeApps(fullWhitelist(context)), null)
-                } catch (e: Exception) {
-                    onResult(-1, e.message ?: "error desconocido")
-                } finally {
-                    try {
-                        Shizuku.unbindUserService(args, this, false)
-                    } catch (e: Exception) {
-                        // ignorar
-                    }
-                }
-            }
-
-            override fun onServiceDisconnected(name: ComponentName?) {}
-        }
-        Shizuku.bindUserService(args, connection)
     }
 
-    /** Devuelve pares (paquete, KB usados) ordenados de mayor a menor consumo. */
-    fun getTopMemoryUsage(context: Context, limit: Int, onResult: (List<Pair<String, Long>>?, String?) -> Unit) {
-        if (!hasPermission()) {
-            onResult(null, "Sin permiso de Shizuku")
-            return
-        }
-        val args = userServiceArgs(context)
-        val connection = object : ServiceConnection {
-            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-                try {
-                    val service = IUserService.Stub.asInterface(binder)
-                    val raw = service.getTopMemoryUsage(limit)
-                    val parsed = raw.lineSequence()
-                        .mapNotNull { line ->
-                            val idx = line.lastIndexOf(':')
-                            if (idx <= 0) return@mapNotNull null
-                            val pkg = line.substring(0, idx)
-                            val kb = line.substring(idx + 1).toLongOrNull() ?: return@mapNotNull null
-                            pkg to kb
-                        }
-                        .toList()
-                    onResult(parsed, null)
-                } catch (e: Exception) {
-                    onResult(null, e.message ?: "error desconocido")
-                } finally {
-                    try {
-                        Shizuku.unbindUserService(args, this, false)
-                    } catch (e: Exception) {
-                        // ignorar
-                    }
-                }
-            }
-
-            override fun onServiceDisconnected(name: ComponentName?) {}
-        }
-        Shizuku.bindUserService(args, connection)
-    }
-
-    /** Cierra solo los paquetes indicados explícitamente (para el buscador de "cerrar apps específicas"). */
     fun forceStopSpecific(context: Context, packages: List<String>, onResult: (count: Int, error: String?) -> Unit) {
-        if (!hasPermission()) {
-            onResult(-1, "Sin permiso de Shizuku")
-            return
+        callService(context, -1, onResult) { service ->
+            service.forceStopSpecific(packages.toTypedArray()) to null
         }
-        val args = userServiceArgs(context)
-        val connection = object : ServiceConnection {
-            override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-                try {
-                    val service = IUserService.Stub.asInterface(binder)
-                    onResult(service.forceStopSpecific(packages.toTypedArray()), null)
-                } catch (e: Exception) {
-                    onResult(-1, e.message ?: "error desconocido")
-                } finally {
-                    try {
-                        Shizuku.unbindUserService(args, this, false)
-                    } catch (e: Exception) {
-                        // ignorar
-                    }
-                }
-            }
+    }
 
-            override fun onServiceDisconnected(name: ComponentName?) {}
+    fun getTopMemoryUsage(context: Context, limit: Int, onResult: (List<Pair<String, Long>>?, String?) -> Unit) {
+        callService(context, null, onResult) { service ->
+            val raw = service.getTopMemoryUsage(limit)
+            val parsed = raw.lineSequence()
+                .mapNotNull { line ->
+                    val idx = line.lastIndexOf(':')
+                    if (idx <= 0) return@mapNotNull null
+                    val pkg = line.substring(0, idx)
+                    val kb = line.substring(idx + 1).toLongOrNull() ?: return@mapNotNull null
+                    pkg to kb
+                }
+                .toList()
+            parsed to null
         }
-        Shizuku.bindUserService(args, connection)
     }
 }

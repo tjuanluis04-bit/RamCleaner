@@ -2,36 +2,22 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
-
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:padding="16dp"
-        android:text="@string/whitelist_instructions" />
+    android:orientation="vertical"
+    android:padding="16dp">
 
     <EditText
-        android:id="@+id/searchBox"
+        android:id="@+id/editSearch"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="12dp"
-        android:layout_marginBottom="8dp"
-        android:hint="@string/search_apps_hint"
-        android:drawableStart="@android:drawable/ic_menu_search"
-        android:drawablePadding="8dp"
+        android:hint="@string/search_hint"
         android:inputType="text"
-        android:maxLines="1" />
+        android:padding="12dp"
+        android:background="@drawable/button_rounded_outline"
+        android:layout_marginBottom="12dp" />
 
     <ListView
-        android:id="@+id/whitelistListView"
+        android:id="@+id/listApps"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
-
-    <Button
-        android:id="@+id/saveWhitelistButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/save_whitelist" />
+        android:layout_height="match_parent" />
 
 </LinearLayout>

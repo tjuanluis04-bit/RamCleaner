@@ -79,5 +79,23 @@
                 android:value="ram_cleaning" />
         </service>
 
+        <!-- Servicio que ejecuta la limpieza al tocar el widget -->
+        <service
+            android:name=".WidgetActionService"
+            android:exported="false" />
+
+        <!-- Widget de pantalla de inicio -->
+        <receiver
+            android:name=".AppWidgetRamCleaner"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.example.ramcleaner.ACTION_WIDGET_CLEAN" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/ram_cleaner_widget_info" />
+        </receiver>
+
     </application>
 </manifest>

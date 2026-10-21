@@ -1,48 +1,64 @@
 package com.example.ramcleaner
 
-import android.app.PendingIntent
-import android.content.Intent
-import android.os.Build
+import android.graphics.drawable.Icon
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
-import android.widget.Toast
 
+/**
+ * Antes, si Shizuku se desconectaba justo cuando tocabas el tile, la
+ * llamada se quedaba esperando una respuesta que nunca llegaba y el tile
+ * se quedaba congelado en "Cerrando..." (STATE_UNAVAILABLE) sin forma de
+ * recuperarse salvo reiniciando la app. Ahora ShizukuHelper SIEMPRE
+ * responde (éxito, error, o timeout) en máximo unos segundos, así que el
+ * tile se puede restaurar a su estado normal pase lo que pase.
+ */
 class RamCleanerTileService : TileService() {
-
-    override fun onClick() {
-        super.onClick()
-
-        if (!ShizukuHelper.hasPermission()) {
-            Toast.makeText(this, "Abre la app y da el permiso de Shizuku primero", Toast.LENGTH_LONG).show()
-            val intent = Intent(this, MainActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val pi = PendingIntent.getActivity(
-                    this, 0, intent, PendingIntent.FLAG_IMMUTABLE
-                )
-                startActivityAndCollapse(pi)
-            } else {
-                @Suppress("DEPRECATION")
-                startActivityAndCollapse(intent)
-            }
-            return
-        }
-
-        qsTile.state = Tile.STATE_UNAVAILABLE
-        qsTile.subtitle = "Cerrando apps…"
-        qsTile.updateTile()
-
-        ShizukuHelper.runForceStop(this) { count, error ->
-            qsTile.state = Tile.STATE_ACTIVE
-            qsTile.subtitle = if (error != null) "Error" else "$count apps cerradas"
-            qsTile.updateTile()
-        }
-    }
 
     override fun onStartListening() {
         super.onStartListening()
-        qsTile.state = Tile.STATE_ACTIVE
-        qsTile.subtitle = "Toca para limpiar"
-        qsTile.updateTile()
+        resetTile()
+    }
+
+    override fun onClick() {
+        super.onClick()
+        val tile = qsTile ?: return
+
+        if (!ShizukuHelper.isShizukuAlive()) {
+            tile.state = Tile.STATE_INACTIVE
+            tile.subtitle = "Shizuku no está activo"
+            tile.updateTile()
+            return
+        }
+
+        tile.state = Tile.STATE_UNAVAILABLE
+        tile.subtitle = "Cerrando apps..."
+        tile.updateTile()
+
+        ShizukuHelper.runForceStop(this) { count, error ->
+            val currentTile = qsTile
+            if (currentTile != null) {
+                if (error != null) {
+                    currentTile.state = Tile.STATE_INACTIVE
+                    currentTile.subtitle = "Error: $error"
+                } else {
+                    currentTile.state = Tile.STATE_ACTIVE
+                    currentTile.subtitle = "$count apps cerradas"
+                }
+                currentTile.updateTile()
+            }
+            // Pase lo que pase, el tile vuelve a su estado normal poco después,
+            // para que nunca quede "pegado" mostrando el resultado anterior.
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                resetTile()
+            }, 2500L)
+        }
+    }
+
+    private fun resetTile() {
+        val tile = qsTile ?: return
+        tile.state = if (ShizukuHelper.isShizukuAlive()) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
+        tile.subtitle = if (ShizukuHelper.isShizukuAlive()) "Toca para limpiar" else "Shizuku no está activo"
+        tile.icon = Icon.createWithResource(this, R.drawable.ic_stat_rocket)
+        tile.updateTile()
     }
 }

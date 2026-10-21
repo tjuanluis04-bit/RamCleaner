@@ -25,6 +25,7 @@ interface IUserService {
 
     // Devuelve las apps que más RAM consumen ahora mismo, como texto
     // "paquete:kilobytes" separado por saltos de línea (ya ordenado desc).
+    // Implementación rápida: lee /proc directamente (sin dumpsys).
     String getTopMemoryUsage(int limit) = 5;
 
     // Cierra (force-stop) solo los paquetes indicados explícitamente.

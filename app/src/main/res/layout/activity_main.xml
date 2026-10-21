@@ -1,147 +1,124 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:gravity="center_horizontal"
-        android:padding="32dp">
+        android:padding="24dp">
 
         <TextView
-            android:id="@+id/ramUsageText"
+            android:id="@+id/textPermissionStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Comprobando Shizuku..."
+            android:textSize="14sp"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="16sp"
+            android:text="RAM en uso"
             android:textStyle="bold"
-            android:layout_marginBottom="8dp"
-            android:text="RAM: —" />
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/textRamPercent"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="--%"
+            android:textSize="32sp"
+            android:textStyle="bold"
+            android:layout_marginTop="4dp" />
 
         <com.example.ramcleaner.RamGraphView
             android:id="@+id/ramGraphView"
             android:layout_width="match_parent"
-            android:layout_height="120dp"
-            android:layout_marginBottom="24dp" />
+            android:layout_height="140dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="20dp" />
+
+        <Button
+            android:id="@+id/buttonCleanNow"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="@string/clean_now"
+            android:background="@drawable/button_rounded"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp" />
 
         <TextView
-            android:id="@+id/statusText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="16sp"
-            android:gravity="center"
-            android:layout_marginBottom="24dp"
-            android:text="@string/status_initial" />
-
-        <Button
-            android:id="@+id/requestPermissionButton"
+            android:id="@+id/textResult"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:text="@string/request_permission" />
-
-        <Button
-            android:id="@+id/killAllButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:text="@string/kill_all" />
-
-        <Button
-            android:id="@+id/closeSpecificButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:text="@string/close_specific_apps" />
-
-        <Button
-            android:id="@+id/freezeButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:text="@string/freeze_apps" />
-
-        <Button
-            android:id="@+id/unfreezeButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:text="@string/unfreeze_apps" />
-
-        <Button
-            android:id="@+id/topMemoryButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="12dp"
-            android:text="@string/top_memory_title" />
-
-        <Button
-            android:id="@+id/whitelistButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="32dp"
-            android:text="@string/edit_whitelist" />
+            android:layout_marginTop="12dp"
+            android:textSize="14sp" />
 
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
-            android:background="#33000000"
-            android:layout_marginBottom="16dp" />
+            android:background="#22000000"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="20dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Auto-activación por umbral de RAM"
+                android:textSize="15sp" />
+
+            <Switch
+                android:id="@+id/switchAutoEnabled"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
 
         <TextView
-            android:layout_width="wrap_content"
+            android:id="@+id/textThresholdValue"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp"
-            android:text="@string/auto_mode_title" />
-
-        <Switch
-            android:id="@+id/autoModeSwitch"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:text="@string/auto_mode_switch" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/threshold_label" />
-
-        <TextView
-            android:id="@+id/thresholdValueText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="4dp"
-            android:text="20%" />
+            android:text="Umbral: 85%"
+            android:textSize="14sp"
+            android:layout_marginBottom="4dp" />
 
         <SeekBar
-            android:id="@+id/thresholdSeekBar"
+            android:id="@+id/seekBarThreshold"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:max="45" />
+            android:max="60"
+            android:progress="35"
+            android:layout_marginBottom="24dp" />
 
-        <View
+        <Button
+            android:id="@+id/buttonWhitelist"
             android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="#33000000"
-            android:layout_marginTop="24dp"
-            android:layout_marginBottom="16dp" />
+            android:layout_height="52dp"
+            android:text="@string/edit_whitelist"
+            android:layout_marginBottom="12dp" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp"
-            android:text="@string/fast_animations_title" />
+        <Button
+            android:id="@+id/buttonCloseSpecific"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="@string/close_specific_apps"
+            android:layout_marginBottom="12dp" />
 
-        <Switch
-            android:id="@+id/fastAnimationsSwitch"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/fast_animations_switch" />
+        <Button
+            android:id="@+id/buttonTopMemory"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="@string/top_memory_title" />
 
     </LinearLayout>
 </ScrollView>
