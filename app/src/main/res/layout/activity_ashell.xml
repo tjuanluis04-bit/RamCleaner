@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Si el botón de limpiar falla, puedes ejecutar la misma limpieza desde aShell (con Shizuku activo). Respeta tu lista blanca y protege Google Play, el launcher, el teclado, Shizuku y aShell."
+            android:textSize="14sp"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Comando corto"
+            android:textStyle="bold"
+            android:textSize="15sp"
+            android:layout_marginBottom="6dp" />
+
+        <TextView
+            android:id="@+id/textCommand"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="12dp"
+            android:textIsSelectable="true"
+            android:typeface="monospace"
+            android:textSize="12sp"
+            android:background="@drawable/button_rounded_outline"
+            android:layout_marginBottom="16dp" />
+
+        <Button
+            android:id="@+id/buttonCopyShort"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="Copiar comando corto"
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/buttonCopyFull"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="Copiar script completo"
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/buttonOpenAShell"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="Abrir aShell"
+            android:layout_marginBottom="20dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Cómo usarlo: 1) Toca \"Copiar comando corto\". 2) Abre aShell. 3) Pega y envía. Si el comando corto no funciona (algunos teléfonos no dejan al shell leer esa carpeta), usa \"Copiar script completo\", que no depende de ningún archivo."
+            android:textSize="13sp" />
+
+    </LinearLayout>
+</ScrollView>

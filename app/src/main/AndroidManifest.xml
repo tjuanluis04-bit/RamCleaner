@@ -44,6 +44,11 @@
             android:label="@string/close_specific_apps" />
 
         <activity
+            android:name=".AShellActivity"
+            android:exported="false"
+            android:label="@string/ashell_title" />
+
+        <activity
             android:name=".TopMemoryActivity"
             android:exported="false"
             android:label="@string/top_memory_title" />

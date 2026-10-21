@@ -59,6 +59,12 @@ class WhitelistActivity : AppCompatActivity() {
         })
     }
 
+    override fun onPause() {
+        super.onPause()
+        // Mantiene al día el script de aShell con la lista blanca nueva.
+        AShellHelper.writeScript(this)
+    }
+
     private fun filter(query: String) {
         val q = query.trim().lowercase()
         filteredApps = if (q.isEmpty()) {

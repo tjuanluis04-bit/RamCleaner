@@ -118,7 +118,14 @@
             android:id="@+id/buttonTopMemory"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:text="@string/top_memory_title" />
+            android:text="@string/top_memory_title"
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/buttonAShell"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="@string/ashell_title" />
 
     </LinearLayout>
 </ScrollView>

@@ -49,6 +49,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.buttonTopMemory).setOnClickListener {
             startActivity(Intent(this, TopMemoryActivity::class.java))
         }
+        findViewById<Button>(R.id.buttonAShell).setOnClickListener {
+            startActivity(Intent(this, AShellActivity::class.java))
+        }
 
         // Umbral: SeekBar va de 0..60, representa 40%..100% (pasos de 1%)
         val savedThreshold = PrefsHelper.getThreshold(this)
@@ -87,6 +90,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updatePermissionStatus()
+        AShellHelper.writeScript(this)
     }
 
     private fun ensurePermission() {
@@ -117,9 +121,10 @@ class MainActivity : AppCompatActivity() {
         textResult.text = "Cerrando apps..."
         ShizukuHelper.runForceStop(this) { count, error ->
             textResult.text = if (error != null) {
-                "✗ $error"
+                "✗ $error\nPuedes usar \"Activar por aShell\" como alternativa."
             } else {
-                "✓ $count apps cerradas"
+                val mode = if (ShizukuHelper.lastBackend == "modo directo") " (modo directo)" else ""
+                "✓ $count apps cerradas$mode"
             }
         }
     }
