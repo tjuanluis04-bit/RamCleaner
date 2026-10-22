@@ -59,7 +59,7 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Cómo usarlo: 1) Toca \"Copiar comando corto\". 2) Abre aShell. 3) Pega y envía. Si el comando corto no funciona (algunos teléfonos no dejan al shell leer esa carpeta), usa \"Copiar script completo\", que no depende de ningún archivo."
+            android:text="Cómo usarlo: 1) Toca &quot;Copiar comando corto&quot;. 2) Abre aShell. 3) Pega y envía. Si el comando corto no funciona (algunos teléfonos no dejan al shell leer esa carpeta), usa &quot;Copiar script completo&quot;, que no depende de ningún archivo."
             android:textSize="13sp" />
 
     </LinearLayout>
